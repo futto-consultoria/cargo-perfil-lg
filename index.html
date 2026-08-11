@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil de Cargos · Futto</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
+
+  :root {
+    --cream:   #FAF9F7;
+    --cream-2: #F3F1EE;
+    --slate:   #26383F;
+    --slate-2: #3a5059;
+    --red:     #E63946;
+    --red-2:   #c62d39;
+    --text:    #1a2c32;
+    --muted:   #6b8590;
+    --border:  #ddd8d0;
+    --white:   #ffffff;
+    --ok:      #2d7a4f;
+    --ok-bg:   #eaf6f0;
+    --warn:    #b45309;
+    --radius:  8px;
+    --shadow:  0 2px 12px rgba(38,56,63,.10);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--slate);
+  }
+  .login-card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 48px 44px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.28);
+  }
+  .login-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--slate);
+    margin-bottom: 4px;
+  }
+  .login-brand span { color: var(--red); }
+  .login-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 36px;
+  }
+  .login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .login-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--slate);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+  .login-field input {
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .login-field input:focus { border-color: var(--slate); }
+  .btn-login {
+    width: 100%;
+    margin-top: 8px;
+    padding: 13px;
+    background: var(--slate);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-login:hover { background: var(--slate-2); }
+  .btn-login:disabled { background: var(--border); cursor: not-allowed; }
+  .login-error {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--red);
+    display: none;
+  }
+
+  /* ── APP (pós-login) ── */
+  #appScreen { display: none; flex-direction: column; flex: 1; }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--slate);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,.18);
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--white);
+  }
+  .logo span { color: var(--red); }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .user-badge {
+    font-size: 12px;
+    color: rgba(255,255,255,.6);
+  }
+  .user-badge strong { color: rgba(255,255,255,.9); }
+  .btn-logout {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,.55);
+    background: none;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all .15s;
+  }
+  .btn-logout:hover { color: var(--white); border-color: rgba(255,255,255,.4); }
+
+  /* ── PROGRESS ── */
+  .progress-wrap {
+    background: var(--slate-2);
+    height: 4px;
+    position: sticky;
+    top: 64px;
+    z-index: 99;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--red);
+    transition: width .4s ease;
+  }
+
+  /* ── LAYOUT ── */
+  .app-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    flex: 1;
+    min-height: calc(100vh - 68px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--white);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 68px);
+    position: sticky;
+    top: 68px;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 20px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--cream-2);
+  }
+  .sidebar-header h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .search-box {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    background: var(--white);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-box:focus { border-color: var(--slate); }
+  .cargo-list { overflow-y: auto; flex: 1; padding: 8px 0; }
+  .cargo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .cargo-item:hover { background: var(--cream); }
+  .cargo-item.active { background: var(--cream-2); border-left-color: var(--red); }
+  .cargo-item.done .item-badge { background: var(--ok); }
+  .item-badge {
+    min-width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--border);
+    font-size: 10px; font-weight: 700;
+    color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .item-code { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .item-name { color: var(--text); flex: 1; }
+
+  .sidebar-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--cream-2);
+  }
+  .stats-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .stat-chip {
+    flex: 1; text-align: center;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 4px;
+    font-size: 11px; color: var(--muted);
+  }
+  .stat-chip strong { display: block; font-size: 18px; color: var(--text); }
+  .stat-chip.s-ok strong { color: var(--ok); }
+  .btn-export {
+    width: 100%;
+    padding: 11px;
+    background: var(--red);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-export:hover { background: var(--red-2); }
+  .btn-export:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+  /* ── MAIN ── */
+  main { padding: 40px 48px; max-width: 900px; }
+
+  /* ── LOADING SPINNER ── */
+  .spinner-wrap {
+    display: flex; align-items: center; justify-content: center;
+    height: 60vh; flex-direction: column; gap: 16px; color: var(--muted);
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--slate);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .cargo-header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid var(--border); }
+  .cargo-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--red); margin-bottom: 6px; }
+  .cargo-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--slate); line-height: 1.2; margin-bottom: 8px; }
+  .cargo-meta { font-size: 12px; color: var(--muted); }
+  .cargo-meta strong { color: var(--ok); }
+
+  .section { margin-bottom: 36px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .field-group { display: flex; flex-direction: column; gap: 20px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 13px; font-weight: 600; color: var(--slate); }
+  textarea, select.field-select {
+    width: 100%; padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px; color: var(--text);
+    background: var(--white); outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    resize: vertical;
+  }
+  textarea:focus, select.field-select:focus {
+    border-color: var(--slate);
+    box-shadow: 0 0 0 3px rgba(38,56,63,.09);
+  }
+  textarea { min-height: 100px; line-height: 1.6; }
+  .counter { font-size: 11px; color: var(--muted); text-align: right; margin-top: 3px; }
+  .counter.warn { color: var(--warn); }
+  .counter.over { color: var(--red); font-weight: 600; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* ── IDIOMAS ── */
+  .idioma-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .idioma-row {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 10px; align-items: center;
+    background: var(--cream-2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .stars-select { display: flex; gap: 4px; align-items: center; }
+  .star-btn {
+    background: none; border: none; font-size: 20px;
+    cursor: pointer; padding: 0; color: #d1ccc4;
+    transition: color .1s; line-height: 1;
+  }
+  .star-btn.active { color: #f5a623; }
+  .fluencia-label { font-size: 11px; color: var(--muted); margin-left: 6px; }
+  .btn-remove {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 6px; padding: 4px 8px;
+    font-size: 16px; cursor: pointer; transition: all .15s; line-height: 1;
+  }
+  .btn-remove:hover { border-color: var(--red); color: var(--red); }
+  .btn-add {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; background: var(--white);
+    border: 1.5px dashed var(--border); border-radius: var(--radius);
+    font-size: 13px; color: var(--slate-2); cursor: pointer;
+    font-family: 'Inter', sans-serif; font-weight: 500;
+    transition: all .15s;
+  }
+  .btn-add:hover { border-color: var(--slate); background: var(--cream-2); }
+
+  /* ── COMPETÊNCIAS ── */
+  .comp-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .comp-tab {
+    padding: 7px 16px; border-radius: 20px;
+    border: 1.5px solid var(--border);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    background: var(--white); color: var(--muted);
+    font-family: 'Inter', sans-serif; transition: all .15s;
+  }
+  .comp-tab.active-tab { background: var(--slate); border-color: var(--slate); color: var(--white); }
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .comp-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: var(--white);
+    border: 1.5px solid var(--border); border-radius: 6px;
+    font-size: 12.5px; cursor: pointer; transition: all .15s; user-select: none;
+  }
+  .comp-chip:hover { border-color: var(--slate-2); }
+  .comp-chip.selected { border-color: var(--slate); background: var(--slate); color: var(--white); }
+  .chip-check { font-size: 14px; color: var(--border); flex-shrink: 0; }
+  .comp-chip.selected .chip-check { color: var(--red); }
+
+  /* ── ACTIONS ── */
+  .action-row {
+    display: flex; gap: 12px; margin-top: 40px;
+    padding-top: 24px; border-top: 1px solid var(--border);
+  }
+  .btn-nav {
+    flex: 1; padding: 12px;
+    border: 1.5px solid var(--border); border-radius: var(--radius);
+    background: var(--white); font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; color: var(--slate);
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-nav:hover { border-color: var(--slate); background: var(--cream-2); }
+  .btn-save {
+    flex: 2; padding: 12px;
+    background: var(--slate); border: none; border-radius: var(--radius);
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--white); cursor: pointer; transition: background .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-save:hover { background: var(--slate-2); }
+  .btn-save:disabled { background: var(--border); cursor: not-allowed; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--slate); color: var(--white);
+    padding: 12px 20px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(10px);
+    transition: all .25s; z-index: 999; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: var(--ok); }
+  .toast.error   { background: var(--red); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 60vh; text-align: center; color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 20px; color: var(--slate); margin-bottom: 8px; }
+  .empty-state p  { font-size: 14px; line-height: 1.6; max-width: 340px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,44,50,.55); z-index: 500;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white); border-radius: 12px;
+    padding: 32px; max-width: 480px; width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal h3 { font-size: 18px; color: var(--slate); margin-bottom: 8px; }
+  .modal p  { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 12px; }
+  .btn-modal-cancel {
+    flex: 1; padding: 10px; border: 1.5px solid var(--border);
+    border-radius: var(--radius); background: var(--white);
+    font-family: 'Inter', sans-serif; font-size: 13px;
+    font-weight: 600; color: var(--slate); cursor: pointer;
+  }
+  .btn-modal-ok {
+    flex: 1; padding: 10px; background: var(--red);
+    border: none; border-radius: var(--radius);
+    font-family: 'Inter', sans-serif; font-size: 13px;
+    font-weight: 600; color: var(--white); cursor: pointer;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<!-- ══ TELA DE LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">Futto<span>.</span></div>
+    <div class="login-sub">Perfil de Cargos — LG Lugar de Gente</div>
+    <div class="login-field">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ══ TELA DO APP ══ -->
+<div id="appScreen">
+  <header>
+    <div class="logo">Futto<span>.</span></div>
+    <div class="header-right">
+      <div class="user-badge" id="userBadge"></div>
+      <button class="btn-logout" onclick="doLogout()">Sair</button>
+    </div>
+  </header>
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progressBar" style="width:0%"></div>
+  </div>
+  <div class="app-grid">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Cargos</h2>
+        <input class="search-box" type="text" placeholder="Buscar cargo..." id="searchInput" oninput="filterCargos()">
+      </div>
+      <div class="cargo-list" id="cargoList"></div>
+      <div class="sidebar-footer">
+        <div class="stats-row">
+          <div class="stat-chip s-ok"><strong id="statDone">0</strong>salvos</div>
+          <div class="stat-chip"><strong id="statTotal">0</strong>total</div>
+        </div>
+        <button class="btn-export" onclick="openExportModal()">⬇ Exportar CSVs para LG</button>
+      </div>
+    </aside>
+    <main id="mainArea">
+      <div class="spinner-wrap"><div class="spinner"></div><span>Carregando...</span></div>
+    </main>
+  </div>
+</div>
+
+<!-- MODAL EXPORTAÇÃO -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h3>Exportar arquivos para LG</h3>
+    <p id="exportModalText"></p>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="btnModalCancel" onclick="closeExportModal()">Cancelar</button>
+      <button class="btn-modal-ok" id="btnModalOk" onclick="doExport()">Exportar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG SUPABASE
+// ═══════════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://xhctjycyydgekgcabfzh.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoY3RqeWN5eWRnZWtnY2FiZnpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDY4OTQsImV4cCI6MjEwMjAyMjg5NH0.gsDIPUWuoUuzjV2Dg9-NPZLggowdAieY6hrLx8mabLY';
+const TENANT_ID     = 'bresco';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ═══════════════════════════════════════════════════════
+// DADOS DO SISTEMA (embutidos — não mudam)
+// ═══════════════════════════════════════════════════════
+const CARGOS = [{"codigo":"2","nome":"ANALISTA DE PLANEJAMENTO E RELAÇÕES COM INVESTIDORES JÚNIOR"},{"codigo":"3","nome":"ANALISTA DE CONTAS A PAGAR"},{"codigo":"4","nome":"ANALISTA DE GESTÃO DE PORTFÓLIO SÊNIOR"},{"codigo":"5","nome":"SUPERVISOR COMERCIAL"},{"codigo":"6","nome":"ANALISTA DE ESTRUTURAÇÃO E ANÁLISE DE INVESTIMENTOS PLENO"},{"codigo":"7","nome":"ARQUITETO"},{"codigo":"8","nome":"COORDENADOR DE ENGENHARIA"},{"codigo":"9","nome":"TRAINEE"},{"codigo":"10","nome":"ANALISTA FINANCEIRO SÊNIOR"},{"codigo":"11","nome":"ANALISTA FISCAL JÚNIOR"},{"codigo":"12","nome":"COORDENADOR DE RECURSOS HUMANOS"},{"codigo":"13","nome":"COORDENADOR CONTÁBIL E FISCAL"},{"codigo":"14","nome":"ESTAGIÁRIO"},{"codigo":"15","nome":"ADVOGADO SÊNIOR"},{"codigo":"16","nome":"ASSISTENTE DE DIRETORIA"},{"codigo":"17","nome":"ADVOGADO"},{"codigo":"18","nome":"ADVOGADO JÚNIOR"},{"codigo":"19","nome":"SECRETÁRIA EXECUTIVA"},{"codigo":"20","nome":"SUPERVISOR DE ENGENHARIA"},{"codigo":"21","nome":"COPEIRO"},{"codigo":"22","nome":"ANALISTA ADMINISTRATIVO"},{"codigo":"24","nome":"ARQUITETO PLENO"},{"codigo":"25","nome":"ANALISTA CONTÁBIL SÊNIOR"},{"codigo":"26","nome":"ANALISTA DE TESOURARIA JÚNIOR"},{"codigo":"27","nome":"COORDENADOR DE GESTÃO DE PORTFÓLIO"},{"codigo":"28","nome":"ANALISTA CONTÁBIL JÚNIOR"},{"codigo":"30","nome":"RECEPCIONISTA"},{"codigo":"31","nome":"COORDENADOR DE TESOURARIA"},{"codigo":"33","nome":"GERENTE DE DESENVOLVIMENTO DE NEGÓCIOS"},{"codigo":"35","nome":"COORDENADOR DE ARQUITETURA"},{"codigo":"37","nome":"ANALISTA DE ESTRUTURAÇÃO E ANÁLISE DE INVESTIMENTOS JÚNIOR"},{"codigo":"38","nome":"GERENTE FINANCEIRO"},{"codigo":"39","nome":"ANALISTA FISCAL PLENO"},{"codigo":"40","nome":"GERENTE DE RECURSOS HUMANOS"},{"codigo":"43","nome":"COORDENADOR JURÍDICO"},{"codigo":"45","nome":"GERENTE JURÍDICO"},{"codigo":"46","nome":"ADVOGADO PLENO"},{"codigo":"47","nome":"COORDENADOR ADMINISTRATIVO"},{"codigo":"48","nome":"GERENTE DE GESTÃO E PORTFÓLIO"},{"codigo":"49","nome":"GERENTE DE ARQUITETURA"},{"codigo":"51","nome":"COORDENADOR DE DESENVOLVIMENTO DE NEGÓCIOS"},{"codigo":"52","nome":"ANALISTA DE PLANEJAMENTO E RELAÇÕES COM INVESTIDORES PLENO"},{"codigo":"56","nome":"ANALISTA DE TESOURARIA PLENO"},{"codigo":"57","nome":"ANALISTA DE RECURSOS HUMANOS JÚNIOR"},{"codigo":"59","nome":"SÓCIO ADMINISTRADOR"},{"codigo":"81","nome":"ANALISTA DE DESENVOLVIMENTO DE NEGÓCIOS"},{"codigo":"84","nome":"SECRETÁRIA"},{"codigo":"85","nome":"ASSISTENTE DE ENGENHARIA"}];
+
+const IDIOMAS = [{codigo:1,nome:"Alemão"},{codigo:2,nome:"Árabe"},{codigo:3,nome:"Cazaque"},{codigo:4,nome:"Chinês"},{codigo:5,nome:"Coreano"},{codigo:6,nome:"Curdo"},{codigo:7,nome:"Espanhol"},{codigo:8,nome:"Francês"},{codigo:9,nome:"Grego"},{codigo:10,nome:"Húngaro"},{codigo:11,nome:"Inglês"},{codigo:12,nome:"Italiano"},{codigo:13,nome:"Japonês"},{codigo:14,nome:"Javanês"},{codigo:15,nome:"Malaio"},{codigo:16,nome:"Mandarim"},{codigo:17,nome:"Neerlandês (Holandês)"},{codigo:18,nome:"Nepalês"},{codigo:19,nome:"Persa"},{codigo:20,nome:"Polonês"},{codigo:21,nome:"Português"},{codigo:22,nome:"Romeno"},{codigo:23,nome:"Russo"},{codigo:24,nome:"Serbo-croata"},{codigo:25,nome:"Somali"},{codigo:26,nome:"Sueco"},{codigo:27,nome:"Tailandês"},{codigo:28,nome:"Tcheco"},{codigo:29,nome:"Turco"},{codigo:30,nome:"Ucraniano"},{codigo:31,nome:"Usbeque"},{codigo:32,nome:"Vietnamita"}];
+
+const FLUENCIA_CATEGORIA = 1;
+const FLUENCIAS = [{codigo:1,nome:"Básico"},{codigo:2,nome:"Intermediário"},{codigo:3,nome:"Avançado"},{codigo:4,nome:"Fluente"}];
+
+const GRAUS_INSTRUCAO = [{v:1,t:"Analfabeto"},{v:2,t:"Até o 5º ano incompleto do Ensino Fundamental"},{v:3,t:"5º ano completo do Ensino Fundamental"},{v:4,t:"Do 6º ao 9º ano do Ensino Fundamental incompleto"},{v:5,t:"Ensino Fundamental completo"},{v:6,t:"Ensino Médio incompleto"},{v:7,t:"Ensino Médio completo"},{v:8,t:"Educação Superior incompleta"},{v:9,t:"Educação Superior completa"},{v:10,t:"Pós-Graduação / Especialização"},{v:11,t:"Doutorado completo"},{v:12,t:"Segundo Grau Técnico incompleto"},{v:13,t:"Segundo Grau Técnico completo"},{v:14,t:"Mestrado"},{v:15,t:"Pós-Doutorado"}];
+
+const EXPERIENCIAS = [{v:3,t:"3 meses"},{v:6,t:"6 meses"},{v:9,t:"9 meses"},{v:12,t:"1 ano"},{v:24,t:"2 anos"},{v:36,t:"3 anos"},{v:48,t:"4 anos"},{v:60,t:"5 anos"},{v:72,t:"6 anos"},{v:84,t:"7 anos"},{v:96,t:"8 anos"},{v:108,t:"9 anos"},{v:120,t:"10 anos"},{v:180,t:"15 anos"},{v:240,t:"20 anos ou mais"}];
+
+const COMPETENCIAS = [{codigo:1,nome:"Adaptabilidade",grupo:1},{codigo:2,nome:"Agilidade",grupo:1},{codigo:3,nome:"Aprendizado contínuo",grupo:1},{codigo:4,nome:"Assume riscos",grupo:1},{codigo:5,nome:"Atitude de servir",grupo:1},{codigo:6,nome:"Atitude inspiradora",grupo:1},{codigo:7,nome:"Capacidade analítica",grupo:1},{codigo:8,nome:"Colaboração",grupo:1},{codigo:9,nome:"Comunicação assertiva",grupo:1},{codigo:10,nome:"Confiabilidade",grupo:1},{codigo:11,nome:"Conhecimentos digitais",grupo:1},{codigo:12,nome:"Criatividade",grupo:1},{codigo:13,nome:"Curiosidade",grupo:1},{codigo:14,nome:"Diálogo transparente",grupo:1},{codigo:16,nome:"Empodera o time",grupo:1},{codigo:17,nome:"Escuta ativa",grupo:1},{codigo:18,nome:"Excelência na entrega",grupo:1},{codigo:19,nome:"Foco em resultados",grupo:1},{codigo:20,nome:"Formação de sucessores",grupo:1},{codigo:21,nome:"Habilidade para tomada de decisões",grupo:1},{codigo:22,nome:"Influência",grupo:1},{codigo:23,nome:"Inovação",grupo:1},{codigo:24,nome:"Inteligência emocional",grupo:1},{codigo:25,nome:"Melhoria contínua",grupo:1},{codigo:26,nome:"Negociação win-win",grupo:1},{codigo:27,nome:"Organização",grupo:1},{codigo:28,nome:"Pensamento complexo para a resolução de problemas",grupo:1},{codigo:29,nome:"Pensamento crítico",grupo:1},{codigo:30,nome:"Protagonismo",grupo:1},{codigo:31,nome:"Questiona o status quo",grupo:1},{codigo:32,nome:"Reconhece talentos",grupo:1},{codigo:33,nome:"Senso de liderança",grupo:1},{codigo:34,nome:"Tomada decisão",grupo:1},{codigo:35,nome:"Trabalho em equipe",grupo:1},{codigo:36,nome:"Visão holística",grupo:1},{codigo:37,nome:"Agile",grupo:2},{codigo:38,nome:"Algoritmo",grupo:2},{codigo:39,nome:"Analytics",grupo:2},{codigo:40,nome:"Arquitetura em Nuvem",grupo:2},{codigo:41,nome:"Asp.net",grupo:2},{codigo:42,nome:"Autocad",grupo:2},{codigo:43,nome:"B2B",grupo:2},{codigo:44,nome:"Banco de Dados Mysql",grupo:2},{codigo:45,nome:"Banco de Dados Oracle",grupo:2},{codigo:46,nome:"BI Services",grupo:2},{codigo:47,nome:"Big Data",grupo:2},{codigo:48,nome:"Bizagi",grupo:2},{codigo:49,nome:"Canais Digitais",grupo:2},{codigo:50,nome:"Canvas Business Model ou Project Model",grupo:2},{codigo:51,nome:"Certificação em PMO",grupo:2},{codigo:52,nome:"CRM - Customer Relationship Management",grupo:2},{codigo:53,nome:"Data Science",grupo:2},{codigo:54,nome:"Design Gráfico",grupo:2},{codigo:55,nome:"Design para App Mobile IOS e Android",grupo:2},{codigo:56,nome:"Design Thinking",grupo:2},{codigo:57,nome:"Educação a Distância",grupo:2},{codigo:58,nome:"E-Learning",grupo:2},{codigo:59,nome:"Excel",grupo:2},{codigo:60,nome:"Experiência do Usuário",grupo:2},{codigo:61,nome:"Framework",grupo:2},{codigo:62,nome:"Gerenciamento de Banco de Dados",grupo:2},{codigo:63,nome:"Gerenciamento de Projetos",grupo:2},{codigo:64,nome:"Gestão da Qualidade",grupo:2},{codigo:65,nome:"Gestão de Projetos",grupo:2},{codigo:66,nome:"Github",grupo:2},{codigo:67,nome:"IBM/BPM",grupo:2},{codigo:68,nome:"ISO 14001",grupo:2},{codigo:69,nome:"ISO 9001",grupo:2},{codigo:70,nome:"Java (Frameworks Jsf, Ejb, J2ee, J2se, Jms, Jpa, Jax-Rs)",grupo:2},{codigo:71,nome:"Java 8",grupo:2},{codigo:72,nome:"Java EE",grupo:2},{codigo:73,nome:"Kaizen",grupo:2},{codigo:74,nome:"Kanban",grupo:2},{codigo:75,nome:"Kibana",grupo:2},{codigo:76,nome:"Lean Office",grupo:2},{codigo:77,nome:"Lean Six Sigma",grupo:2},{codigo:78,nome:"Manutenção de Hardware",grupo:2},{codigo:79,nome:"Metodologia Ágil",grupo:2},{codigo:80,nome:"Metodologia Canvas",grupo:2},{codigo:81,nome:"Mídias Digitais",grupo:2},{codigo:82,nome:"Mobile",grupo:2},{codigo:83,nome:"Ms Project",grupo:2},{codigo:84,nome:"NR 10",grupo:2},{codigo:85,nome:"NR 12",grupo:2},{codigo:86,nome:"NR 35",grupo:2},{codigo:87,nome:"Oracle",grupo:2},{codigo:88,nome:"Pacote Office",grupo:2},{codigo:89,nome:"Planejamento Estratégico",grupo:2},{codigo:90,nome:"Power BI",grupo:2},{codigo:91,nome:"Project Management",grupo:2},{codigo:92,nome:"Python",grupo:2},{codigo:93,nome:"Scrum Master",grupo:2},{codigo:94,nome:"Sql Oracle",grupo:2},{codigo:95,nome:"Agilidade na tomada de decisão",grupo:3},{codigo:96,nome:"Capacidade analítica",grupo:3},{codigo:97,nome:"Comunicação",grupo:3},{codigo:98,nome:"Empatia",grupo:3},{codigo:99,nome:"Espírito empreendedor",grupo:3},{codigo:100,nome:"Foco em resultados",grupo:3},{codigo:101,nome:"Orientação para custos",grupo:3},{codigo:102,nome:"Resiliência",grupo:3},{codigo:103,nome:"Senso de urgência",grupo:3},{codigo:104,nome:"Visão humana sobre indivíduos e processos",grupo:3},{codigo:105,nome:"Visão sistêmica",grupo:3}];
+
+// ═══════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════
+let currentUser  = null;
+let perfisCache  = {};   // cargo_codigo → objeto completo do banco
+let cargoAtual   = null;
+let activeCompTab = 1;
+let isSaving     = false;
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('btnLogin');
+  const err   = document.getElementById('loginError');
+
+  if (!email || !pass) { showLoginError('Preencha e-mail e senha.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  err.style.display = 'none';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+
+  if (error) {
+    showLoginError('E-mail ou senha incorretos.');
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+    return;
+  }
+
+  currentUser = data.user;
+  await initApp();
+}
+
+function showLoginError(msg) {
+  const err = document.getElementById('loginError');
+  err.textContent = msg;
+  err.style.display = 'block';
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  perfisCache = {};
+  cargoAtual  = null;
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('btnLogin').disabled = false;
+  document.getElementById('btnLogin').textContent = 'Entrar';
+}
+
+// Detecta sessão já ativa ao carregar a página
+async function checkSession() {
+  const { data } = await sb.auth.getSession();
+  if (data?.session?.user) {
+    currentUser = data.session.user;
+    await initApp();
+  }
+  // Se não há sessão, a tela de login já está visível por padrão
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT APP
+// ═══════════════════════════════════════════════════════
+async function initApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display  = 'flex';
+
+  const email = currentUser.email;
+  document.getElementById('userBadge').innerHTML =
+    `Logado como <strong>${email}</strong>`;
+
+  // Carregar todos os perfis salvos de uma vez
+  await carregarTodosPerfis();
+  renderSidebar();
+
+  document.getElementById('mainArea').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <h3>Selecione um cargo</h3>
+      <p>Escolha um cargo na lista ao lado para preencher ou continuar de onde parou.</p>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE — LEITURA
+// ═══════════════════════════════════════════════════════
+async function carregarTodosPerfis() {
+  const { data, error } = await sb
+    .from('cargo_perfil')
+    .select('*')
+    .eq('tenant_id', TENANT_ID);
+
+  if (error) { showToast('Erro ao carregar dados', 'error'); return; }
+
+  perfisCache = {};
+  (data || []).forEach(row => {
+    perfisCache[row.cargo_codigo] = row;
+  });
+}
+
+function getPerfil(codigo) {
+  if (!perfisCache[codigo]) {
+    // Perfil ainda não salvo — retorna objeto vazio (só existe em memória)
+    perfisCache[codigo] = {
+      cargo_codigo: codigo,
+      tenant_id: TENANT_ID,
+      desc_resumida: '',
+      desc_detalhada: '',
+      grau_instrucao: null,
+      obs_escolaridade: '',
+      experiencia: null,
+      obs_experiencia: '',
+      idiomas: [],
+      competencias: [],
+      updated_at: null,
+      _novo: true
+    };
+  }
+  return perfisCache[codigo];
+}
+
+function isPreenchido(codigo) {
+  const p = perfisCache[codigo];
+  if (!p || p._novo) return false;
+  return !!(p.desc_resumida || p.desc_detalhada || p.grau_instrucao ||
+            p.experiencia || (p.idiomas||[]).length || (p.competencias||[]).length);
+}
+
+function countDone() {
+  return CARGOS.filter(c => isPreenchido(c.codigo)).length;
+}
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE — ESCRITA (upsert + audit)
+// ═══════════════════════════════════════════════════════
+async function salvarNoBanco(codigo) {
+  if (isSaving) return;
+  isSaving = true;
+
+  const btn = document.getElementById('btnSalvar');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Salvando...'; }
+
+  // Captura estado atual dos campos do DOM
+  const p = getPerfil(codigo);
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+  const payload = {
+    tenant_id:        TENANT_ID,
+    cargo_codigo:     codigo,
+    desc_resumida:    g('descResumida'),
+    desc_detalhada:   g('descDetalhada'),
+    grau_instrucao:   g('grauInstrucao') ? parseInt(g('grauInstrucao')) : null,
+    obs_escolaridade: g('obsEscolaridade'),
+    experiencia:      g('experiencia') ? parseInt(g('experiencia')) : null,
+    obs_experiencia:  g('obsExperiencia'),
+    idiomas:          p.idiomas || [],
+    competencias:     p.competencias || [],
+    updated_at:       new Date().toISOString(),
+    updated_by:       currentUser.id
+  };
+
+  // Upsert na tabela principal
+  const { error: errUpsert } = await sb
+    .from('cargo_perfil')
+    .upsert(payload, { onConflict: 'tenant_id,cargo_codigo' });
+
+  if (errUpsert) {
+    showToast('Erro ao salvar: ' + errUpsert.message, 'error');
+    isSaving = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = '✓ Salvar cargo'; }
+    return;
+  }
+
+  // Audit log — snapshot imutável
+  await sb.from('audit_log').insert({
+    tenant_id:    TENANT_ID,
+    cargo_codigo: codigo,
+    user_id:      currentUser.id,
+    user_email:   currentUser.email,
+    snapshot:     payload,
+    saved_at:     new Date().toISOString()
+  });
+
+  // Atualiza cache local
+  perfisCache[codigo] = { ...payload, _novo: false };
+
+  renderSidebar(document.getElementById('searchInput').value);
+  showToast('Cargo salvo com sucesso!', 'success');
+
+  // Atualiza meta do cargo no form
+  const metaEl = document.getElementById('cargoMeta');
+  if (metaEl) {
+    metaEl.innerHTML = `Último save: <strong>${new Date().toLocaleString('pt-BR')}</strong> por ${currentUser.email}`;
+  }
+
+  isSaving = false;
+  if (btn) { btn.disabled = false; btn.innerHTML = '✓ Salvar cargo'; }
+}
+
+// ═══════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════
+function renderSidebar(filter = '') {
+  const list = document.getElementById('cargoList');
+  const term = filter.toLowerCase();
+  const filtered = CARGOS.filter(c =>
+    c.nome.toLowerCase().includes(term) || c.codigo.includes(term)
+  );
+
+  list.innerHTML = filtered.map(c => {
+    const done   = isPreenchido(c.codigo);
+    const active = cargoAtual === c.codigo ? 'active' : '';
+    const cls    = done ? 'done' : '';
+    const badge  = done ? '✓' : c.codigo;
+    return `<div class="cargo-item ${active} ${cls}" onclick="selectCargo('${c.codigo}')">
+      <span class="item-badge">${badge}</span>
+      <span class="item-code">#${c.codigo}</span>
+      <span class="item-name">${c.nome}</span>
+    </div>`;
+  }).join('');
+
+  const done  = countDone();
+  const total = CARGOS.length;
+  document.getElementById('statDone').textContent  = done;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('progressBar').style.width = Math.round((done / total) * 100) + '%';
+}
+
+function filterCargos() {
+  renderSidebar(document.getElementById('searchInput').value);
+}
+
+// ═══════════════════════════════════════════════════════
+// FORMULÁRIO
+// ═══════════════════════════════════════════════════════
+async function selectCargo(codigo) {
+  cargoAtual = codigo;
+  renderSidebar(document.getElementById('searchInput').value);
+  renderForm(codigo);
+}
+
+function renderForm(codigo) {
+  const cargo = CARGOS.find(c => c.codigo === codigo);
+  const p     = getPerfil(codigo);
+  const main  = document.getElementById('mainArea');
+  const idx   = CARGOS.findIndex(c => c.codigo === codigo);
+
+  const updatedAt = p.updated_at
+    ? `Último save: <strong>${new Date(p.updated_at).toLocaleString('pt-BR')}</strong>`
+    : 'Ainda não salvo';
+
+  main.innerHTML = `
+  <div class="cargo-header">
+    <div class="cargo-eyebrow">Código ${cargo.codigo}</div>
+    <div class="cargo-title">${cargo.nome}</div>
+    <div class="cargo-meta" id="cargoMeta">${updatedAt}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Descrição</div>
+    <div class="field-group">
+      <div class="field">
+        <label for="descResumida">Descrição Resumida</label>
+        <textarea id="descResumida" maxlength="1500" oninput="updateCounter('descResumida',1500)"
+          placeholder="Descreva brevemente as responsabilidades principais do cargo...">${esc(p.desc_resumida)}</textarea>
+        <div class="counter" id="ctr-descResumida">${(p.desc_resumida||'').length}/1500</div>
+      </div>
+      <div class="field">
+        <label for="descDetalhada">Descrição Detalhada</label>
+        <textarea id="descDetalhada" style="min-height:140px" maxlength="5500" oninput="updateCounter('descDetalhada',5500)"
+          placeholder="Descreva em detalhes atividades, responsabilidades e atribuições...">${esc(p.desc_detalhada)}</textarea>
+        <div class="counter" id="ctr-descDetalhada">${(p.desc_detalhada||'').length}/5500</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Escolaridade</div>
+    <div class="field-group">
+      <div class="row-2">
+        <div class="field">
+          <label>Grau de Instrução</label>
+          <select class="field-select" id="grauInstrucao">
+            <option value="">— Selecione —</option>
+            ${GRAUS_INSTRUCAO.map(g => `<option value="${g.v}" ${p.grau_instrucao==g.v?'selected':''}>${g.t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="obsEscolaridade">Observações sobre Escolaridade</label>
+        <textarea id="obsEscolaridade" maxlength="1500" oninput="updateCounter('obsEscolaridade',1500)"
+          placeholder="Formações necessárias, cursos complementares, certificações...">${esc(p.obs_escolaridade)}</textarea>
+        <div class="counter" id="ctr-obsEscolaridade">${(p.obs_escolaridade||'').length}/1500</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Experiência</div>
+    <div class="field-group">
+      <div class="row-2">
+        <div class="field">
+          <label>Experiência Necessária</label>
+          <select class="field-select" id="experiencia">
+            <option value="">— Selecione —</option>
+            ${EXPERIENCIAS.map(e => `<option value="${e.v}" ${p.experiencia==e.v?'selected':''}>${e.t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="obsExperiencia">Observações sobre Experiência</label>
+        <textarea id="obsExperiencia" maxlength="1500" oninput="updateCounter('obsExperiencia',1500)"
+          placeholder="Áreas de experiência relevantes, tipo de empresa, setor de atuação...">${esc(p.obs_experiencia)}</textarea>
+        <div class="counter" id="ctr-obsExperiencia">${(p.obs_experiencia||'').length}/1500</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Idiomas</div>
+    <div id="idiomaList"></div>
+    <button class="btn-add" onclick="adicionarIdioma()">+ Adicionar idioma</button>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Competências</div>
+    <div class="comp-tabs">
+      <button class="comp-tab ${activeCompTab===1?'active-tab':''}" onclick="setCompTab(1)">Comportamental</button>
+      <button class="comp-tab ${activeCompTab===2?'active-tab':''}" onclick="setCompTab(2)">Técnica</button>
+      <button class="comp-tab ${activeCompTab===3?'active-tab':''}" onclick="setCompTab(3)">Organizacional</button>
+    </div>
+    <div class="comp-grid" id="compGrid"></div>
+  </div>
+
+  <div class="action-row">
+    ${idx > 0
+      ? `<button class="btn-nav" onclick="navegarCargo(-1)">← Anterior</button>`
+      : `<span></span>`}
+    <button class="btn-save" id="btnSalvar" onclick="salvarNoBanco('${codigo}')">✓ Salvar cargo</button>
+    ${idx < CARGOS.length - 1
+      ? `<button class="btn-nav" onclick="navegarCargo(1)">Próximo →</button>`
+      : `<span></span>`}
+  </div>`;
+
+  renderIdiomaList();
+  renderCompGrid();
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateCounter(id, max) {
+  const el  = document.getElementById(id);
+  const ctr = document.getElementById('ctr-' + id);
+  if (!el || !ctr) return;
+  const len = el.value.length;
+  ctr.textContent = len + '/' + max;
+  ctr.className = 'counter' + (len >= max ? ' over' : len > max * 0.9 ? ' warn' : '');
+}
+
+// ── IDIOMAS ──
+function renderIdiomaList() {
+  const p   = getPerfil(cargoAtual);
+  const div = document.getElementById('idiomaList');
+  if (!div) return;
+
+  const idiomas = p.idiomas || [];
+  if (idiomas.length === 0) { div.innerHTML = ''; return; }
+
+  div.innerHTML = `<div class="idioma-list">
+    ${idiomas.map((item, i) => `
+    <div class="idioma-row">
+      <select class="field-select" onchange="updateIdioma(${i},'idIdm',this.value)">
+        <option value="">— Idioma —</option>
+        ${IDIOMAS.map(id => `<option value="${id.codigo}" ${item.idIdm==id.codigo?'selected':''}>${id.nome}</option>`).join('')}
+      </select>
+      <div class="stars-select">
+        ${[1,2,3,4].map(n => `<button class="star-btn ${item.fluencia>=n?'active':''}" onclick="setFluencia(${i},${n})" title="${FLUENCIAS[n-1].nome}">★</button>`).join('')}
+        <span class="fluencia-label">${item.fluencia ? FLUENCIAS[item.fluencia-1].nome : ''}</span>
+      </div>
+      <button class="btn-remove" onclick="removerIdioma(${i})">×</button>
+    </div>`).join('')}
+  </div>`;
+}
+
+function adicionarIdioma() {
+  const p = getPerfil(cargoAtual);
+  p.idiomas = p.idiomas || [];
+  p.idiomas.push({ idIdm: '', fluencia: 0 });
+  renderIdiomaList();
+}
+
+function updateIdioma(idx, campo, valor) {
+  const p = getPerfil(cargoAtual);
+  p.idiomas[idx][campo] = valor;
+  renderIdiomaList();
+}
+
+function setFluencia(idx, nivel) {
+  const p = getPerfil(cargoAtual);
+  p.idiomas[idx].fluencia = nivel;
+  renderIdiomaList();
+}
+
+function removerIdioma(idx) {
+  const p = getPerfil(cargoAtual);
+  p.idiomas.splice(idx, 1);
+  renderIdiomaList();
+}
+
+// ── COMPETÊNCIAS ──
+function setCompTab(grupo) {
+  activeCompTab = grupo;
+  document.querySelectorAll('.comp-tab').forEach((t, i) => {
+    t.classList.toggle('active-tab', i + 1 === grupo);
+  });
+  renderCompGrid();
+}
+
+function renderCompGrid() {
+  const p    = getPerfil(cargoAtual);
+  const grid = document.getElementById('compGrid');
+  if (!grid) return;
+  const comps = p.competencias || [];
+  grid.innerHTML = COMPETENCIAS.filter(c => c.grupo === activeCompTab).map(c => {
+    const sel = comps.includes(c.codigo);
+    return `<div class="comp-chip ${sel?'selected':''}" onclick="toggleComp(${c.codigo})">
+      <span class="chip-check">${sel ? '✓' : '○'}</span>
+      <span>${c.nome}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleComp(codigo) {
+  const p     = getPerfil(cargoAtual);
+  p.competencias = p.competencias || [];
+  const idx = p.competencias.indexOf(codigo);
+  if (idx >= 0) p.competencias.splice(idx, 1);
+  else p.competencias.push(codigo);
+  renderCompGrid();
+}
+
+// ── NAVEGAÇÃO ──
+function navegarCargo(dir) {
+  const idx  = CARGOS.findIndex(c => c.codigo === cargoAtual);
+  const novo = CARGOS[idx + dir];
+  if (novo) selectCargo(novo.codigo);
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORTAÇÃO CSV
+// ═══════════════════════════════════════════════════════
+function openExportModal() {
+  const done  = countDone();
+  const total = CARGOS.length;
+  const modal = document.getElementById('exportModal');
+  const txt   = document.getElementById('exportModalText');
+  const btnOk = document.getElementById('btnModalOk');
+  const btnCc = document.getElementById('btnModalCancel');
+
+  if (done === 0) {
+    txt.textContent = 'Nenhum cargo foi salvo ainda. Preencha e salve ao menos um cargo.';
+    btnOk.style.display = 'none';
+    btnCc.textContent = 'Fechar';
+  } else {
+    txt.innerHTML = done < total
+      ? `<strong>${done} de ${total} cargos</strong> foram salvos. Os demais serão ignorados na exportação. Deseja continuar?`
+      : `Todos os <strong>${total} cargos</strong> estão salvos. Pronto para exportar.`;
+    btnOk.style.display = '';
+    btnCc.textContent = 'Cancelar';
+  }
+  modal.classList.add('open');
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('open');
+}
+
+function doExport() {
+  closeExportModal();
+  const cargosPreenchidos = CARGOS.filter(c => isPreenchido(c.codigo));
+
+  downloadCSV(gerarCSVCargo(cargosPreenchidos),       'Cargo.csv');
+  downloadCSV(gerarCSVIdioma(cargosPreenchidos),      'Cargo_ListaPerfilIdioma.csv');
+  downloadCSV(gerarCSVIdiomaCateg(cargosPreenchidos), 'Cargo_ListaPerfilIdiomaCategoria.csv');
+  downloadCSV(gerarCSVCompetencia(cargosPreenchidos), 'Cargo_ListaPerfilCompetencia.csv');
+
+  showToast(`${cargosPreenchidos.length} cargos exportados em 4 arquivos`, 'success');
+}
+
+function gerarCSVCargo(cargos) {
+  return cargos.map(c => {
+    const p    = perfisCache[c.codigo];
+    const cols = new Array(36).fill('');
+    cols[0]  = c.codigo;
+    cols[13] = limpar(p.desc_resumida,    1500);
+    cols[14] = limpar(p.desc_detalhada,   5500);
+    cols[15] = p.grau_instrucao != null ? p.grau_instrucao : '';
+    cols[16] = limpar(p.obs_escolaridade, 1500);
+    cols[17] = p.experiencia != null ? p.experiencia : '';
+    cols[18] = limpar(p.obs_experiencia,  1500);
+    return cols.map(csvQuote).join(';');
+  }).join('\r\n');
+}
+
+function gerarCSVIdioma(cargos) {
+  const linhas = [];
+  cargos.forEach(c => {
+    (perfisCache[c.codigo].idiomas || [])
+      .filter(i => i.idIdm && i.fluencia)
+      .forEach(i => linhas.push([c.codigo, i.idIdm].map(csvQuote).join(';')));
+  });
+  return linhas.join('\r\n');
+}
+
+function gerarCSVIdiomaCateg(cargos) {
+  const linhas = [];
+  cargos.forEach(c => {
+    (perfisCache[c.codigo].idiomas || [])
+      .filter(i => i.idIdm && i.fluencia)
+      .forEach(i => linhas.push(
+        [c.codigo, i.idIdm, FLUENCIA_CATEGORIA, i.fluencia].map(csvQuote).join(';')
+      ));
+  });
+  return linhas.join('\r\n');
+}
+
+function gerarCSVCompetencia(cargos) {
+  const linhas = [];
+  cargos.forEach(c => {
+    (perfisCache[c.codigo].competencias || [])
+      .forEach(cod => linhas.push([c.codigo, cod, ''].map(csvQuote).join(';')));
+  });
+  return linhas.join('\r\n');
+}
+
+function limpar(str, max) {
+  return (str || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, max);
+}
+
+function csvQuote(val) {
+  const s = String(val ?? '');
+  if (s.includes(';') || s.includes('"') || s.includes('\n'))
+    return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function downloadCSV(content, filename) {
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+// Enter no login
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── INICIALIZAÇÃO ──
+checkSession();
+</script>
+</body>
+</html>
