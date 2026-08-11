@@ -531,22 +531,25 @@ function renderDashTable() {
   body.innerHTML = filtered.map(c => {
     const campos  = getCampos(c.codigo);
     const status  = getCargoStatus(c.codigo);
-    const pill = (ok) => ok
-      ? `<span class="pill pill-ok">✓</span>`
-      : `<span class="pill pill-miss">✗</span>`;
+
+    const pill = (ok, campo) => {
+      const tip = ok ? `${campo}: preenchido` : `${campo}: não preenchido — clique para editar`;
+      const cls = ok ? 'pill-ok' : 'pill-miss';
+      const ico = ok ? '✓' : '✗';
+      return `<span class="pill ${cls}" title="${tip}">${ico}</span>`;
+    };
 
     const statusLabel = { completo: 'Completo', parcial: 'Incompleto', vazio: 'Não iniciado' }[status];
-    const statusCls   = status;
 
-    return `<tr onclick="abrirCargoDosDashboard('${c.codigo}')">
+    return `<tr onclick="abrirCargoDosDashboard('${c.codigo}')" title="Clique para abrir e editar este cargo">
       <td class="cargo-codigo-cell">#${c.codigo}</td>
       <td class="cargo-nome-cell">${c.nome}</td>
-      <td style="text-align:center">${pill(campos.descricao)}</td>
-      <td style="text-align:center">${pill(campos.escolaridade)}</td>
-      <td style="text-align:center">${pill(campos.experiencia)}</td>
-      <td style="text-align:center">${pill(campos.idiomas)}</td>
-      <td style="text-align:center">${pill(campos.competencias)}</td>
-      <td style="text-align:center"><span class="row-status ${statusCls}">${statusLabel}</span></td>
+      <td style="text-align:center">${pill(campos.descricao,    'Descrição')}</td>
+      <td style="text-align:center">${pill(campos.escolaridade, 'Escolaridade')}</td>
+      <td style="text-align:center">${pill(campos.experiencia,  'Experiência')}</td>
+      <td style="text-align:center">${pill(campos.idiomas,      'Idiomas')}</td>
+      <td style="text-align:center">${pill(campos.competencias, 'Competências')}</td>
+      <td style="text-align:center"><span class="row-status ${status}">${statusLabel}</span></td>
     </tr>`;
   }).join('');
 }
