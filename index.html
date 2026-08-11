@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perfil de Cargos · Futto</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
 
@@ -132,6 +133,14 @@
   .stat-chip.s-ok strong { color: var(--ok); }
   .btn-export { width: 100%; padding: 11px; background: var(--red); color: var(--white); border: none; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s; }
   .btn-export:hover { background: var(--red-2); }
+  .btn-secondary { padding: 9px 6px; background: var(--white); color: var(--slate); border: 1.5px solid var(--border); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; text-align:center; }
+  .btn-secondary:hover { border-color: var(--slate); background: var(--cream-2); }
+  .btn-import:hover { border-color: var(--ok); color: var(--ok); }
+  /* Modal de importação */
+  .import-log { margin-top: 16px; max-height: 220px; overflow-y: auto; background: var(--cream-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-size: 12px; font-family: monospace; line-height: 1.8; }
+  .log-ok   { color: var(--ok); }
+  .log-warn { color: var(--warn); }
+  .log-err  { color: var(--red); font-weight: 600; }
 
   main { padding: 40px 48px; max-width: 900px; flex: 1; }
 
@@ -293,6 +302,11 @@
           <div class="stat-chip"><strong id="statTotal">0</strong>total</div>
         </div>
         <button class="btn-export" onclick="openExportModal()">⬇ Exportar CSVs para LG</button>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-secondary" onclick="baixarTemplate()" style="flex:1">📥 Template</button>
+          <button class="btn-secondary btn-import" onclick="document.getElementById('xlsxInput').click()" style="flex:1">📤 Importar</button>
+        </div>
+        <input type="file" id="xlsxInput" accept=".xlsx" style="display:none" onchange="importarExcel(this)">
       </div>
     </aside>
     <main id="mainArea">
@@ -309,6 +323,19 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" id="btnModalCancel" onclick="closeExportModal()">Cancelar</button>
       <button class="btn-modal-ok" id="btnModalOk" onclick="doExport()">Exportar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAÇÃO -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal" style="max-width:560px">
+    <h3 id="importModalTitle">Importando Excel...</h3>
+    <p id="importModalDesc" style="margin-bottom:8px"></p>
+    <div class="import-log" id="importLog"></div>
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="btn-modal-cancel" onclick="closeImportModal()">Fechar</button>
+      <button class="btn-modal-ok" id="btnConfirmImport" onclick="confirmarImport()" style="display:none">Salvar tudo</button>
     </div>
   </div>
 </div>
@@ -874,6 +901,243 @@ function showToast(msg,type='') {
 
 document.getElementById('loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 checkSession();
+
+// ═══════════════════════════════════════════════
+// IMPORTAÇÃO EXCEL
+// ═══════════════════════════════════════════════
+
+// Mapas texto → código (para converter o que o cliente digitou)
+const GRAU_MAP = {
+  "analfabeto":1, "até o 5º ano incompleto do ensino fundamental":2,
+  "5º ano completo do ensino fundamental":3, "do 6º ao 9º ano do ensino fundamental incompleto":4,
+  "ensino fundamental completo":5, "ensino médio incompleto":6, "ensino médio completo":7,
+  "educação superior incompleta":8, "educação superior completa":9,
+  "pós-graduação / especialização":10, "doutorado completo":11,
+  "segundo grau técnico incompleto":12, "segundo grau técnico completo":13,
+  "mestrado":14, "pós-doutorado":15
+};
+const EXP_MAP = {
+  "3 meses":3,"6 meses":6,"9 meses":9,"1 ano":12,"2 anos":24,"3 anos":36,
+  "4 anos":48,"5 anos":60,"6 anos":72,"7 anos":84,"8 anos":96,"9 anos":108,
+  "10 anos":120,"15 anos":180,"20 anos ou mais":240
+};
+const IDIOMA_MAP = {};
+IDIOMAS.forEach(i => { IDIOMA_MAP[i.nome.toLowerCase()] = i.codigo; });
+const FLUENCIA_MAP = {"básico":1,"intermediário":2,"avançado":3,"fluente":4};
+const COMP_MAP = {};
+COMPETENCIAS.forEach(c => { COMP_MAP[c.nome.toLowerCase()] = c.codigo; });
+
+// Estado temporário da importação
+let importPayloads = [];
+
+function baixarTemplate() {
+  // Redireciona para o template hospedado no repo
+  const url = 'https://raw.githubusercontent.com/futto-consultoria/cargo-perfil-lg/main/Template_Perfil_Cargos_LG.xlsx';
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Template_Perfil_Cargos_LG.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('open');
+  importPayloads = [];
+  document.getElementById('xlsxInput').value = '';
+}
+
+function log(msg, tipo='') {
+  const div = document.getElementById('importLog');
+  div.innerHTML += `<div class="log-${tipo}">${msg}</div>`;
+  div.scrollTop = div.scrollHeight;
+}
+
+async function importarExcel(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+
+  document.getElementById('importModal').classList.add('open');
+  document.getElementById('importModalTitle').textContent = 'Analisando planilha...';
+  document.getElementById('importModalDesc').textContent = '';
+  document.getElementById('importLog').innerHTML = '';
+  document.getElementById('btnConfirmImport').style.display = 'none';
+  importPayloads = [];
+
+  const buf = await file.arrayBuffer();
+  let wb;
+  try {
+    wb = XLSX.read(buf, { type: 'array' });
+  } catch(e) {
+    log('Erro ao ler o arquivo. Verifique se é um .xlsx válido.', 'err');
+    return;
+  }
+
+  const abas = wb.SheetNames;
+  log(`Arquivo: <strong>${file.name}</strong> · Abas: ${abas.join(', ')}`);
+
+  // ── Mapa de cargos válidos ──
+  const cargosCodigos = new Set(CARGOS.map(c => String(c.codigo)));
+  // Acumula dados por cargo
+  const dados = {};
+  CARGOS.forEach(c => {
+    dados[c.codigo] = {
+      cargo_codigo: c.codigo, tenant_id: TENANT_ID,
+      desc_resumida:'', desc_detalhada:'',
+      grau_instrucao: null, obs_escolaridade:'',
+      experiencia: null, obs_experiencia:'',
+      idiomas:[], competencias:[],
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.id
+    };
+  });
+
+  // ── Ler aba Descrições ──
+  if (abas.includes('Descrições')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Descrições'], { defval: '' });
+    let ok = 0;
+    rows.forEach(r => {
+      const cod = String(r['Código']||'').trim();
+      if (!cargosCodigos.has(cod)) return;
+      const resumida  = String(r['Descrição Resumida']||'').trim().substring(0, 1500);
+      const detalhada = String(r['Descrição Detalhada']||'').trim().substring(0, 5500);
+      if (resumida || detalhada) {
+        dados[cod].desc_resumida  = resumida;
+        dados[cod].desc_detalhada = detalhada;
+        ok++;
+      }
+    });
+    log(`Descrições: ${ok} cargos com dados`, ok > 0 ? 'ok' : 'warn');
+  } else { log('Aba "Descrições" não encontrada — ignorada', 'warn'); }
+
+  // ── Ler aba Escolaridade ──
+  if (abas.includes('Escolaridade')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Escolaridade'], { defval: '' });
+    let ok = 0, erros = 0;
+    rows.forEach(r => {
+      const cod = String(r['Código']||'').trim();
+      if (!cargosCodigos.has(cod)) return;
+      const grauTxt = String(r['Grau de Instrução']||'').trim().toLowerCase();
+      const obs     = String(r['Observações']||'').trim().substring(0, 1500);
+      if (grauTxt && !GRAU_MAP[grauTxt]) {
+        log(`Escolaridade: grau inválido "${r['Grau de Instrução']}" no cargo ${cod}`, 'warn');
+        erros++;
+      }
+      if (grauTxt && GRAU_MAP[grauTxt]) { dados[cod].grau_instrucao = GRAU_MAP[grauTxt]; ok++; }
+      if (obs) dados[cod].obs_escolaridade = obs;
+    });
+    log(`Escolaridade: ${ok} graus importados${erros ? ` · ${erros} inválidos` : ''}`, ok > 0 ? 'ok' : 'warn');
+  } else { log('Aba "Escolaridade" não encontrada — ignorada', 'warn'); }
+
+  // ── Ler aba Experiência ──
+  if (abas.includes('Experiência')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Experiência'], { defval: '' });
+    let ok = 0, erros = 0;
+    rows.forEach(r => {
+      const cod = String(r['Código']||'').trim();
+      if (!cargosCodigos.has(cod)) return;
+      const expTxt = String(r['Experiência Mínima']||'').trim().toLowerCase();
+      const obs    = String(r['Observações']||'').trim().substring(0, 1500);
+      if (expTxt && !EXP_MAP[expTxt]) {
+        log(`Experiência: valor inválido "${r['Experiência Mínima']}" no cargo ${cod}`, 'warn');
+        erros++;
+      }
+      if (expTxt && EXP_MAP[expTxt]) { dados[cod].experiencia = EXP_MAP[expTxt]; ok++; }
+      if (obs) dados[cod].obs_experiencia = obs;
+    });
+    log(`Experiência: ${ok} valores importados${erros ? ` · ${erros} inválidos` : ''}`, ok > 0 ? 'ok' : 'warn');
+  } else { log('Aba "Experiência" não encontrada — ignorada', 'warn'); }
+
+  // ── Ler aba Idiomas ──
+  if (abas.includes('Idiomas')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Idiomas'], { defval: '' });
+    let ok = 0, erros = 0;
+    rows.forEach(r => {
+      const cod    = String(r['Código']||'').trim();
+      if (!cargosCodigos.has(cod)) return;
+      const idmTxt = String(r['Idioma']||'').trim().toLowerCase();
+      const fluTxt = String(r['Fluência']||'').trim().toLowerCase();
+      if (!idmTxt) return;
+      const idmCod = IDIOMA_MAP[idmTxt];
+      const fluCod = FLUENCIA_MAP[fluTxt];
+      if (!idmCod) { log(`Idiomas: idioma inválido "${r['Idioma']}" no cargo ${cod}`, 'warn'); erros++; return; }
+      if (!fluCod) { log(`Idiomas: fluência inválida "${r['Fluência']}" no cargo ${cod}`, 'warn'); erros++; return; }
+      // Evitar duplicata do mesmo idioma no mesmo cargo
+      const jaExiste = dados[cod].idiomas.some(i => i.idIdm == idmCod);
+      if (!jaExiste) { dados[cod].idiomas.push({ idIdm: idmCod, fluencia: fluCod }); ok++; }
+    });
+    log(`Idiomas: ${ok} registros importados${erros ? ` · ${erros} inválidos` : ''}`, ok > 0 ? 'ok' : 'warn');
+  } else { log('Aba "Idiomas" não encontrada — ignorada', 'warn'); }
+
+  // ── Ler aba Competências ──
+  if (abas.includes('Competências')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Competências'], { defval: '' });
+    let ok = 0, erros = 0;
+    rows.forEach(r => {
+      const cod     = String(r['Código']||'').trim();
+      if (!cargosCodigos.has(cod)) return;
+      const compTxt = String(r['Competência']||'').trim().toLowerCase();
+      if (!compTxt) return;
+      const compCod = COMP_MAP[compTxt];
+      if (!compCod) { log(`Competências: "${r['Competência']}" inválida no cargo ${cod}`, 'warn'); erros++; return; }
+      if (!dados[cod].competencias.includes(compCod)) { dados[cod].competencias.push(compCod); ok++; }
+    });
+    log(`Competências: ${ok} registros importados${erros ? ` · ${erros} inválidos` : ''}`, ok > 0 ? 'ok' : 'warn');
+  } else { log('Aba "Competências" não encontrada — ignorada', 'warn'); }
+
+  // ── Resumo ──
+  importPayloads = Object.values(dados).filter(d =>
+    d.desc_resumida || d.desc_detalhada || d.grau_instrucao ||
+    d.experiencia || d.idiomas.length || d.competencias.length
+  );
+
+  log('─'.repeat(40));
+  if (importPayloads.length === 0) {
+    log('Nenhum dado válido encontrado para importar.', 'err');
+    document.getElementById('importModalTitle').textContent = 'Nenhum dado encontrado';
+    return;
+  }
+
+  log(`<strong>${importPayloads.length} cargos</strong> prontos para salvar no banco.`, 'ok');
+  document.getElementById('importModalTitle').textContent = 'Pré-visualização da importação';
+  document.getElementById('importModalDesc').textContent  = 'Revise os avisos acima e confirme para salvar.';
+  document.getElementById('btnConfirmImport').style.display = '';
+}
+
+async function confirmarImport() {
+  const btn = document.getElementById('btnConfirmImport');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  log('─'.repeat(40));
+  log('Salvando no banco...', '');
+
+  let salvos = 0, erros = 0;
+  for (const payload of importPayloads) {
+    const { error } = await sb.from('cargo_perfil')
+      .upsert(payload, { onConflict: 'tenant_id,cargo_codigo' });
+
+    if (error) {
+      log(`Erro no cargo ${payload.cargo_codigo}: ${error.message}`, 'err');
+      erros++;
+      continue;
+    }
+
+    // Audit log
+    await sb.from('audit_log').insert({
+      tenant_id: TENANT_ID, cargo_codigo: payload.cargo_codigo,
+      user_id: currentUser.id, user_email: currentUser.email,
+      snapshot: { ...payload, origem: 'importacao_excel' },
+      saved_at: new Date().toISOString()
+    });
+
+    perfisCache[payload.cargo_codigo] = { ...payload, _novo: false };
+    salvos++;
+  }
+
+  log(`Concluído: <strong>${salvos} salvos</strong>${erros ? ` · ${erros} com erro` : ''}`, erros ? 'warn' : 'ok');
+  document.getElementById('importModalTitle').textContent = 'Importação concluída';
+  btn.textContent = 'Salvo!'; btn.disabled = true;
+
+  renderSidebar();
+  renderDashboard();
+  showToast(`${salvos} cargos importados com sucesso`, 'success');
+}
 </script>
 </body>
 </html>
